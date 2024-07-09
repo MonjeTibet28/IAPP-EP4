@@ -2,48 +2,50 @@ import {getConnection} from '../database/database'
 
 const createProducto = async (req, res) => {
     try {
-        const { nombre, descripcion, precio, cantidad_stock, categoria_id } = req.body;
+        const { nombre, descripcion, precio, cantidad_stock, categoria_id, detalles } = req.body;
 
         if (!nombre || !precio || !cantidad_stock || !categoria_id) {
             return res.status(400).json({ 'message': 'Todos los campos son obligatorios' });
         }
- 
         const cn = await getConnection();
         const [categoria] = await cn.query('SELECT id FROM categorias WHERE id = ?', [categoria_id]);
-        
-        if (!categoria) {
-            return res.status(400).json({ 'message': 'ID de categoría no válida' });
+           if (!categoria) {
+               return res.status(400).json({ 'message': 'ID de categoría no válida' });
+           }
+        const result = await cn.query(`INSERT INTO productos (nombre, descripcion, precio, cantidad_stock, categoria_id) VALUES (?, ?, ?, ?, ?)`,
+             [nombre, descripcion, precio, cantidad_stock, categoria_id]);
+        const productoId = result.insertId;
+        if (detalles && detalles.length > 0) {
+            detalles.forEach(async (detalle) => {
+                await cn.query(`INSERT INTO detallesProductos (producto_id, detalle, valor) VALUES (?, ?, ?)`, [productoId, detalle.detalle, detalle.valor]);
+            });
         }
-
-        const result = await cn.query(`INSERT INTO productos (nombre, descripcion, precio, cantidad_stock, categoria_id) 
-            VALUES (?, ?, ?, ?, ?)`, [nombre, descripcion, precio, cantidad_stock, categoria_id]);
-
-        res.status(201).json({ 'message': 'Producto creado', 'id': result.insertId });
+        res.status(201).json({ 'message': 'Producto creado', 'id': productoId });
     } catch (error) {
         res.status(500).send(error.message);
     }
-}
-
+};
 const getProducto = async (req, res) => {
     try {
         const { id } = req.params;
 
         if (!id) {
-            return res.status(400).json({ 'message': 'El ID es obligatorio' });
+            return res.status(400).json({ 'message': 'El ID del producto es obligatorio' });
         }
 
         const cn = await getConnection();
-        const result = await cn.query(`SELECT * FROM productos WHERE id = ?`, [id]);
-
-        if (result.length === 0) {
+        const [producto] = await cn.query('SELECT * FROM productos WHERE id = ?', [id]);
+        if (!producto) {
             return res.status(404).json({ 'message': 'Producto no encontrado' });
         }
 
-        res.status(200).json(result[0]);
+        const detalles = await cn.query('SELECT * FROM detallesProductos WHERE producto_id = ?', [id]);
+
+        res.status(200).json({ producto, detalles });
     } catch (error) {
         res.status(500).send(error.message);
     }
-}
+};
 
 const updateProducto = async (req, res) => {
     try {
