@@ -87,7 +87,14 @@ const deleteOrden = async (req, res) => {
         }
 
         const cn = await getConnection();
-        const result = await cn.query(`DELETE FROM ordenes WHERE id = ?`, [id]);
+
+        const [detalles] = await cn.query('SELECT * FROM detallesordenes WHERE orden_id = ?', [id]);
+
+        if (detalles.length > 0) {
+            return res.status(400).json({ 'message': 'La orden no se puede eliminar porque tiene detalles asociados' });
+        }
+
+        const result = await cn.query('DELETE FROM ordenes WHERE id = ?', [id]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ 'message': 'Orden no encontrada' });
@@ -95,9 +102,14 @@ const deleteOrden = async (req, res) => {
 
         res.status(200).json({ 'message': 'Orden eliminada' });
     } catch (error) {
+     //   console.error('Error al eliminar la orden:', error);
+        if (error.code && error.code.startsWith('ER_')) {
+            return res.status(400).json({ 'message': 'La orden no se puede eliminar porque tiene detalles asociados' });
+        }
         res.status(500).send(error.message);
     }
 }
+
 
 
 

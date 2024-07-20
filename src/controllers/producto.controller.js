@@ -79,6 +79,13 @@ const deleteProducto = async (req, res) => {
         }
 
         const cn = await getConnection();
+
+        const detalles = await cn.query(`SELECT * FROM detalles WHERE producto_id = ?`, [id]);
+
+        if (detalles.length > 0) {
+            return res.status(400).json({ 'message': 'No se puede eliminar el producto porque tiene detalles asociados' });
+        }
+
         const result = await cn.query(`DELETE FROM productos WHERE id = ?`, [id]);
 
         if (result.affectedRows === 0) {
@@ -87,7 +94,12 @@ const deleteProducto = async (req, res) => {
 
         res.status(200).json({ 'message': 'Producto eliminado' });
     } catch (error) {
-        res.status(500).send(error.message);
+       // console.error('Error al eliminar el producto:', error);
+        if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+            return res.status(400).json({ 'message': 'No se puede eliminar el producto porque tiene detalles asociados' });
+        }
+        res.status(500).json({ 'message': 'Error al eliminar el producto' });
+
     }
 }
 
